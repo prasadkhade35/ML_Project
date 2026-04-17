@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Flue Gas Predictor — Polyethylene Combustion</title>
+  <style>
+    /* ── Reset & base ──────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #1a237e 0%, #283593 60%, #1565c0 100%);
+      color: white;
+      padding: 28px 40px 22px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    }
+    header h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.3px; }
+    header p  { font-size: 0.88rem; opacity: 0.82; margin-top: 5px; }
+    .badges   { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .badge {
+      background: rgba(255,255,255,0.18);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 20px;
+      padding: 3px 12px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────────── */
+    main {
+      max-width: 960px;
+      margin: 36px auto;
+      padding: 0 20px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    @media (max-width: 640px) { main { grid-template-columns: 1fr; } }
+
+    /* ── Card ───────────────────────────────────────────────────────────────── */
+    .card {
+      background: white;
+      border-radius: 14px;
+      padding: 28px 32px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    }
+    .card h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #1a237e;
+      border-bottom: 2px solid #e8eaf6;
+      padding-bottom: 10px;
+      margin-bottom: 22px;
+    }
+    .card.full { grid-column: 1 / -1; }
+
+    /* ── Form ───────────────────────────────────────────────────────────────── */
+    .form-group { margin-bottom: 18px; }
+    label {
+      display: block;
+      font-size: 0.83rem;
+      font-weight: 600;
+      color: #37474f;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    input[type="number"], select {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid #cfd8dc;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      color: #1a1a2e;
+      background: #fafafa;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    input[type="number"]:focus, select:focus {
+      border-color: #1565c0;
+      box-shadow: 0 0 0 3px rgba(21,101,192,0.12);
+      background: white;
+    }
+    .hint { font-size: 0.76rem; color: #90a4ae; margin-top: 4px; }
+
+    /* ── Button ─────────────────────────────────────────────────────────────── */
+    .btn {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #1565c0, #1a237e);
+      color: white;
+      border: none;
+      border-radius: 9px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      margin-top: 6px;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(21,101,192,0.35); }
+    .btn:active { transform: none; }
+
+    /* ── Results ────────────────────────────────────────────────────────────── */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 540px) { .results-grid { grid-template-columns: 1fr; } }
+
+    .result-card {
+      border-radius: 12px;
+      padding: 22px 18px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .result-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 5px;
+    }
+    .r-co2  { background: #e8eaf6; } .r-co2::before  { background: #1565c0; }
+    .r-co   { background: #ffebee; } .r-co::before   { background: #c62828; }
+    .r-c2h4 { background: #e8f5e9; } .r-c2h4::before { background: #2e7d32; }
+
+    .result-val {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+    .r-co2  .result-val { color: #1565c0; }
+    .r-co   .result-val { color: #c62828; }
+    .r-c2h4 .result-val { color: #2e7d32; }
+
+    .result-unit { font-size: 0.8rem; color: #546e7a; font-weight: 600; margin-top: 4px; }
+    .result-label { font-size: 0.85rem; color: #455a64; margin-top: 10px; font-weight: 700; }
+
+    /* ── Info panel ─────────────────────────────────────────────────────────── */
+    .info-list { list-style: none; padding: 0; }
+    .info-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #f5f5f5;
+      font-size: 0.87rem;
+      color: #455a64;
+    }
+    .info-list li:last-child { border-bottom: none; }
+    .info-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #1565c0;
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+
+    /* ── Alert ──────────────────────────────────────────────────────────────── */
+    .alert {
+      background: #fff3e0;
+      border-left: 4px solid #ef6c00;
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-size: 0.88rem;
+      color: #bf360c;
+      margin-bottom: 16px;
+    }
+
+    /* ── Input summary ──────────────────────────────────────────────────────── */
+    .input-summary {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.84rem;
+      color: #546e7a;
+      margin-bottom: 18px;
+    }
+    .input-summary span { font-weight: 700; color: #1a237e; }
+
+    /* ── Footer ─────────────────────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      font-size: 0.78rem;
+      color: #90a4ae;
+      padding: 24px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🔥 Flue Gas Composition Predictor</h1>
+  <p>Polyethylene combustion in a Fluidised Bed Reactor — ML-powered emission estimation</p>
+  <div class="badges">
+    <span class="badge">Random Forest</span>
+    <span class="badge">Group K-Fold k=3</span>
+    <span class="badge">R² 0.90–0.97</span>
+    <span class="badge">Berkowicz &amp; Żukowski (2020)</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Input form ── -->
+  <div class="card">
+    <h2>⚙️ Operating Conditions</h2>
+
+    {% if error %}
+    <div class="alert">⚠ {{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/predict">
+
+      <div class="form-group">
+        <label>Temperature (°C)</label>
+        <input type="number" name="temperature" min="400" max="1000" step="50"
+               value="{{ inputs.temperature if inputs else 700 }}" required>
+        <p class="hint">Range: 400 – 1000 °C &nbsp;|&nbsp; Typical: 500, 600, 700, 800, 900 °C</p>
+      </div>
+
+      <div class="form-group">
+        <label>Bed Type</label>
+        <select name="bed_type">
+          <option value="Inert"          {% if inputs and inputs.bed_type == 'Inert' %}selected{% endif %}>Inert (Cenosphere)</option>
+          <option value="Catalytic_Fe2O3"{% if inputs and inputs.bed_type == 'Catalytic_Fe2O3' %}selected{% endif %}>Catalytic (Fe₂O₃)</option>
+        </select>
+        <p class="hint">Fe₂O₃ bed promotes complete combustion, reducing CO and C₂H₄</p>
+      </div>
+
+      <div class="form-group">
+        <label>Polymer Type</label>
+        <select name="polymer_type">
+          <option value="PE"   {% if inputs and inputs.polymer_type == 'PE' %}selected{% endif %}>PE (Polyethylene)</option>
+          <option value="LLDPE"{% if inputs and inputs.polymer_type == 'LLDPE' %}selected{% endif %}>LLDPE (Linear Low-Density PE)</option>
+          <option value="HDPE" {% if inputs and inputs.polymer_type == 'HDPE' %}selected{% endif %}>HDPE (High-Density PE)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Sample Mass (mg)</label>
+        <input type="number" name="mass_mg" min="50" max="400" step="1"
+               value="{{ inputs.mass_mg if inputs else 150 }}" required>
+        <p class="hint">Typical range: 96 – 307 mg</p>
+      </div>
+
+      <div class="form-group">
+        <label>Reaction Time (s)</label>
+        <input type="number" name="time_s" min="1" max="200" step="1"
+               value="{{ inputs.time_s if inputs else 20 }}" required>
+        <p class="hint">FTIR measurement interval: 7–8 s. Peak emissions: ~14–28 s</p>
+      </div>
+
+      <button type="submit" class="btn">🔬 Predict Flue Gas Composition</button>
+    </form>
+  </div>
+
+  <!-- ── Results + info ── -->
+  <div class="card">
+    <h2>📊 Predicted Emissions</h2>
+
+    {% if result %}
+    <div class="input-summary">
+      Conditions: <span>{{ inputs.temperature }}°C</span> &nbsp;|&nbsp;
+      <span>{{ inputs.bed_type }}</span> &nbsp;|&nbsp;
+      <span>{{ inputs.polymer_type }}</span> &nbsp;|&nbsp;
+      <span>{{ inputs.mass_mg }} mg</span> &nbsp;|&nbsp;
+      <span>{{ inputs.time_s }} s</span>
+    </div>
+
+    <div class="results-grid">
+      <div class="result-card r-co2">
+        <div class="result-val">{{ result.CO2_vol_pct }}</div>
+        <div class="result-unit">vol %</div>
+        <div class="result-label">CO₂</div>
+      </div>
+      <div class="result-card r-co">
+        <div class="result-val">{{ result.CO_ppm }}</div>
+        <div class="result-unit">ppm</div>
+        <div class="result-label">CO</div>
+      </div>
+      <div class="result-card r-c2h4">
+        <div class="result-val">{{ result.C2H4_ppm }}</div>
+        <div class="result-unit">ppm</div>
+        <div class="result-label">C₂H₄</div>
+      </div>
+    </div>
+
+    {% else %}
+    <p style="color:#90a4ae;font-size:0.9rem;text-align:center;padding:40px 0;">
+      Enter operating conditions and click<br><b>Predict</b> to see results.
+    </p>
+    {% endif %}
+
+    <div style="margin-top:26px;">
+      <h2 style="font-size:0.95rem;margin-bottom:12px;">ℹ️ Model Information</h2>
+      <ul class="info-list">
+        <li><span class="info-dot"></span>Champion: <b>Random Forest Regressor</b> — scikit-learn ensemble of 200 trees</li>
+        <li><span class="info-dot"></span>Validated with <b>Group K-Fold (k=3)</b> — whole experiments held out per fold</li>
+        <li><span class="info-dot"></span>Target generalisation <b>R² 0.90–0.97</b> — balanced bias-variance trade-off</li>
+        <li><span class="info-dot"></span>CO₂ is predicted first; CO and C₂H₄ use CO₂ as an auxiliary feature</li>
+        <li><span class="info-dot"></span>Dataset: Berkowicz &amp; Żukowski (2020), 1 266 FTIR observations, 90 experiments</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ── API docs ── -->
+  <div class="card full">
+    <h2>🔌 REST API — Programmatic Access</h2>
+    <p style="font-size:0.88rem;color:#546e7a;margin-bottom:14px;">
+      Send a <code>POST</code> request to <code>/api/predict</code> with a JSON body:
+    </p>
+    <pre style="background:#1a237e;color:#e8eaf6;padding:16px 20px;border-radius:9px;
+                font-size:0.83rem;overflow-x:auto;line-height:1.7;">
+curl -X POST http://127.0.0.1:5000/api/predict \
+     -H 'Content-Type: application/json' \
+     -d '{
+           "temperature":  700,
+           "bed_type":     "Inert",
+           "polymer_type": "PE",
+           "mass_mg":      150,
+           "time_s":       20
+         }'
+
+# Response:
+{
+  "status": "ok",
+  "predictions": {
+    "CO2_vol_pct": 12.5430,
+    "CO_ppm":      845.20,
+    "C2H4_ppm":    63.80
+  }
+}</pre>
+  </div>
+
+</main>
+
+<footer>
+  Flue Gas Predictor &nbsp;·&nbsp; Random Forest (k=3 Group K-Fold) &nbsp;·&nbsp;
+  Dataset: Berkowicz &amp; Żukowski, Data in Brief 32 (2020) &nbsp;·&nbsp;
+  CL 653 Final Project
+</footer>
+
+</body>
+</html>
