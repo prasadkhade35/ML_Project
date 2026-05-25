@@ -3,7 +3,7 @@
 
 ---
 
-## What was changed from the original notebook
+## Whats in the notebook
 
 
 | K-Fold splits  | **k = 3** |
