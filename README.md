@@ -5,16 +5,13 @@
 
 ## What was changed from the original notebook
 
-| Change | Original | Updated |
-|--------|----------|---------|
-| XGBoost | ✓ included | ✗ **removed** |
-| LightGBM | ✓ included | ✗ **removed** |
-| K-Fold splits | k = 5 | **k = 3** |
-| Champion model | Best CV scorer | **Random Forest (all targets)** |
-| RF hyperparams | depth=5, min_leaf=10 | **depth=10, min_leaf=10, max_features='sqrt'** |
-| Target R² band | 0.96–0.98 | **0.90–0.97** (balanced, no overfit) |
-| Model saving | ✗ | ✓ **joblib → models/** |
-| Flask web app | ✗ | ✓ **app.py + templates/** |
+
+| K-Fold splits  | **k = 3** |
+| Champion model | **Random Forest (all targets)** |
+| RF hyperparams | **depth=10, min_leaf=10, max_features='sqrt'** |
+| Target R² band | **0.90–0.97** (balanced, no overfit) |
+| Model saving   |✓ **joblib → models/** |
+| Flask web app  | ✓ **app.py + templates/** |
 
 ---
 
